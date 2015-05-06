@@ -12,7 +12,8 @@ usage() {
   echo ""
   echo "Commands:"
   echo "    build  Build a docker image from this repo and tag it with the git sha and branch"
-  echo "    push   Push the built image to the docker registry"
+  echo "    push   Push the built image to the docker registry. \$DOCKER_EMAIL, \$DOCKER_USER, and \$DOCKER_PASS are required"
+  exit 1
 }
 
 # Build builds the docker image and tags it with the git sha and branch.
@@ -26,7 +27,12 @@ build() {
 # Push pushes all of the built docker images.
 push() {
   declare repo="$1"
-  docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+
+  if [ -z "$DOCKER_EMAIL" ] || [ -z "$DOCKER_USER" ] || [ -z "$DOCKER_PASS" ]; then
+    usage
+  fi
+
+  docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
   docker push "$repo"
 }
 
