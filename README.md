@@ -42,8 +42,8 @@ To use this script, merge the following in to your `circle.yml`:
 ```yml
 dependencies:
   pre:
-    - curl https://raw.githubusercontent.com/remind101/docker-build/script/docker-build > /usr/local/bin/docker-build
-    - chmod +x /usr/local/bin/docker-build
+    - curl https://raw.githubusercontent.com/remind101/docker-build/script/docker-build > /home/ubuntu/bin/docker-build
+    - chmod +x /home/ubuntu/bin/docker-build
 
 deployment:
   hub: 
