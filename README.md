@@ -1,4 +1,4 @@
-`docker-build` is a small program for building, tagging and pushing docker images within circle CI.
+`docker-build` is a small script for building, tagging and pushing docker images within circle CI.
 
 It makes the following assumptions:
 
