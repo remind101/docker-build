@@ -1,0 +1,49 @@
+#!/bin/bash
+
+set -e
+
+# The docker repo.
+REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+
+# Usage prints the help for this command.
+usage() {
+  echo "Usage:"
+  echo "    docker-build command"
+  echo ""
+  echo "Commands:"
+  echo "    build  Build a docker image from this repo and tag it with the git sha and branch"
+  echo "    push   Push the built image to the docker registry. \$DOCKER_EMAIL, \$DOCKER_USER, and \$DOCKER_PASS are required"
+  exit 1
+}
+
+# Build builds the docker image and tags it with the git sha and branch.
+build() {
+  declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
+  docker build --no-cache -t "$repo" .
+  docker tag "$repo" "${repo}:${sha}"
+  docker tag "$repo" "${repo}:${branch}"
+}
+
+# Push pushes all of the built docker images.
+push() {
+  declare repo="$1"
+
+  if [ -z "$DOCKER_EMAIL" ] || [ -z "$DOCKER_USER" ] || [ -z "$DOCKER_PASS" ]; then
+    usage
+  fi
+
+  docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
+  docker push "$repo"
+}
+
+case "$1" in
+  "build")
+    build "$REPO"
+    ;;
+  "push")
+    push "$REPO"
+    ;;
+  *)
+    usage
+    ;;
+esac
