@@ -1,4 +1,4 @@
-`docker-build` is a small Go program for building, tagging and pushing docker images within circle CI.
+`docker-build` is a small program for building, tagging and pushing docker images within circle CI.
 
 It makes the following assumptions:
 
@@ -14,9 +14,23 @@ It makes the following assumptions:
 $ docker-build build
 ```
 
+Equivalent to:
+
+```console
+$ docker build --no-cache -t "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME" .
+$ docker tag "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME" \
+  "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:$CIRCLE_SHA1"
+```
 
 **Push the resulting image to docker registry**
 
 ```console
 $ docker-build push
+```
+
+Equivalent to:
+
+```console
+$ docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+$ docker push "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 ```
