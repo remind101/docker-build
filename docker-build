@@ -11,15 +11,16 @@ usage() {
   echo "    docker-build command"
   echo ""
   echo "Commands:"
-  echo "    build  Build a docker image from this repo and tag it with the git sha"
+  echo "    build  Build a docker image from this repo and tag it with the git sha and branch"
   echo "    push   Push the built image to the docker registry"
 }
 
-# Build builds the docker image and tags it with the git sha.
+# Build builds the docker image and tags it with the git sha and branch.
 build() {
-  declare repo="$1" sha="$CIRCLE_SHA1"
+  declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
   docker build --no-cache -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
+  docker tag "$repo" "${repo}:${branch}"
 }
 
 # Push pushes all of the built docker images.

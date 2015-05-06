@@ -3,7 +3,7 @@
 It makes the following assumptions:
 
 1. Your docker registry repo and GitHub repo are the same (e.g. remind101/acme-inc on GitHub, remind101/acme-inc on Docker registry).
-2. You want to tag the docker image with the value of the `$CIRLE_SHA1` (git commit sha).
+2. You want to tag the docker image with the value of the `$CIRLE_SHA1` (git commit sha) and `$CIRCLE_BRANCH` (git branch).
 3. You're docker credentials are provided as `$DOCKER_EMAIL`, `$DOCKER_USER`, `$DOCKER_PASS`
 
 ## Usage
