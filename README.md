@@ -34,3 +34,21 @@ Equivalent to:
 $ docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
 $ docker push "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 ```
+
+### Circle CI
+
+To use this script, merge the following in to your `circle.yml`:
+
+```yml
+dependencies:
+  pre:
+    - curl https://raw.githubusercontent.com/remind101/docker-build/script/docker-build > /usr/local/bin/docker-build
+    - chmod +x /usr/local/bin/docker-build
+
+deployment:
+  hub: 
+    branch: /.*/
+    commands:
+      - docker-build push
+      - docker images
+```
