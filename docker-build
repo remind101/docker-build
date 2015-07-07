@@ -24,7 +24,7 @@ login() {
 build() {
   declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
   login
-  docker pull "$repo"
+  docker pull "${repo}:${branch}" # Pull the last build for this branch so we can use cached layers.
   docker build -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
   docker tag "$repo" "${repo}:${branch}"
