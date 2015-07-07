@@ -16,10 +16,16 @@ usage() {
   exit 1
 }
 
+login() {
+  docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
+}
+
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
   declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
-  docker build --no-cache -t "$repo" .
+  login
+  docker pull "$repo"
+  docker build -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
   docker tag "$repo" "${repo}:${branch}"
 }
@@ -32,7 +38,7 @@ push() {
     usage
   fi
 
-  docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
+  login
   docker push "$repo"
 }
 
