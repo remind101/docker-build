@@ -49,7 +49,10 @@ case "$1" in
   "push")
     push "$REPO"
     ;;
-  *)
+  "help")
     usage
+    ;;
+  *)
+    build "$REPO" && push "$REPO"
     ;;
 esac
