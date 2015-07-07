@@ -27,7 +27,7 @@ build() {
   docker pull "${repo}:${branch}" # Pull the last build for this branch so we can use cached layers.
   docker build -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
-  docker tag "$repo" "${repo}:${branch}"
+  docker tag -f "$repo" "${repo}:${branch}" # Force tag because we pulled the last build for this branch.
 }
 
 # Push pushes all of the built docker images.
