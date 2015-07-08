@@ -2,6 +2,8 @@
 
 set -e
 
+DOCKER_URL="https://master.dockerproject.org/linux/amd64/docker-1.8.0-dev"
+
 # The docker repo.
 REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 
@@ -20,10 +22,23 @@ login() {
   docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
 }
 
+# Downloads the most recent version, installs it and starts it.
+download() {
+  sudo service docker stop
+  sudo curl -L -o /usr/bin/docker "$DOCKER_URL"
+  sudo chmod 0755 /usr/bin/docker
+  sudo service docker start
+}
+
+# Init downloads docker, starts it and logs in.
+init() {
+  download
+  login
+}
+
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
   declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
-  login
   docker pull "${repo}:${branch}" # Pull the last build for this branch so we can use cached layers.
   docker build -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
@@ -38,11 +53,13 @@ push() {
     usage
   fi
 
-  login
   docker push "$repo"
 }
 
 case "$1" in
+  "init")
+    init
+    ;;
   "build")
     build "$REPO"
     ;;
@@ -53,6 +70,6 @@ case "$1" in
     usage
     ;;
   *)
-    build "$REPO" && push "$REPO"
+    init && build "$REPO" && push "$REPO"
     ;;
 esac
