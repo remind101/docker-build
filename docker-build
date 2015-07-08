@@ -24,7 +24,9 @@ login() {
 
 # Downloads the most recent version, installs it and starts it.
 download() {
-  sudo service docker stop; sudo curl -L -o /usr/bin/docker "$DOCKER_URL"; sudo chmod 0755 /usr/bin/docker; sudo service docker start; true
+  sudo curl -L -o /usr/bin/docker "$DOCKER_URL"
+  sudo chmod 0755 /usr/bin/docker
+  sudo service docker start
   docker version
 }
 
