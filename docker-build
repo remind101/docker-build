@@ -32,6 +32,7 @@ download() {
 # Init downloads docker, starts it and logs in.
 init() {
   download
+  sleep 30
   login
 }
 
