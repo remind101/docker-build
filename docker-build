@@ -27,8 +27,6 @@ download() {
   sudo curl -L -o /usr/bin/docker "$DOCKER_URL"
   sudo chmod 0755 /usr/bin/docker
   sudo service docker start
-  sleep 10
-  docker version
 }
 
 # Init downloads docker, starts it and logs in.
