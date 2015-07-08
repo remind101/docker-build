@@ -2,7 +2,7 @@
 
 set -e
 
-DOCKER_URL="https://master.dockerproject.org/linux/amd64/docker-1.8.0-dev"
+DOCKER_URL="http://s3-external-1.amazonaws.com/circle-downloads/docker-1.6.0-circleci"
 
 # The docker repo.
 REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
@@ -32,7 +32,6 @@ download() {
 # Init downloads docker, starts it and logs in.
 init() {
   download
-  sleep 30
   login
 }
 
