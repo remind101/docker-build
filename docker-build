@@ -39,7 +39,7 @@ init() {
 # pull an image tagged with the branch and fallback to "latest"
 pull() {
   declare repo="$1" branch="$CIRCLE_BRANCH"
-  docker pull "${repo}:${branch}" || docker pull "${repo}:latest"
+  docker pull "${repo}:${branch}" || docker pull "${repo}:latest" || true
 }
 
 # Build builds the docker image and tags it with the git sha and branch.
