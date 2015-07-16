@@ -42,6 +42,10 @@ $ docker push "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 To use this script, merge the following in to your `circle.yml`:
 
 ```yml
+machine:
+  services:
+    - docker
+
 dependencies:
   pre:
     - curl https://raw.githubusercontent.com/remind101/docker-build/master/docker-build > /home/ubuntu/bin/docker-build
