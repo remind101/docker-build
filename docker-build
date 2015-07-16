@@ -2,6 +2,8 @@
 
 set -e
 
+DOCKER_URL="http://s3-external-1.amazonaws.com/circle-downloads/docker-1.6.0-circleci"
+
 # The docker repo.
 REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 
@@ -16,12 +18,37 @@ usage() {
   exit 1
 }
 
+login() {
+  docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
+}
+
+# Downloads the most recent version, installs it and starts it.
+download() {
+  sudo curl -L -o /usr/bin/docker "$DOCKER_URL"
+  sudo chmod 0755 /usr/bin/docker
+  sudo service docker start
+}
+
+# Init downloads docker, starts it and logs in.
+init() {
+  download
+  login
+}
+
+# Pull attempts to pull the last built image for this branch. It will try to
+# pull an image tagged with the branch and fallback to "latest"
+pull() {
+  declare repo="$1" branch="$CIRCLE_BRANCH"
+  docker pull "${repo}:${branch}" || docker pull "${repo}:latest" || true
+}
+
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
   declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
-  docker build --no-cache -t "$repo" .
+  pull "$repo"
+  docker build -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
-  docker tag "$repo" "${repo}:${branch}"
+  docker tag -f "$repo" "${repo}:${branch}" # Force tag because we pulled the last build for this branch.
 }
 
 # Push pushes all of the built docker images.
@@ -32,18 +59,23 @@ push() {
     usage
   fi
 
-  docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
   docker push "$repo"
 }
 
 case "$1" in
+  "init")
+    init
+    ;;
   "build")
     build "$REPO"
     ;;
   "push")
     push "$REPO"
     ;;
-  *)
+  "help")
     usage
+    ;;
+  *)
+    init && build "$REPO" && push "$REPO"
     ;;
 esac

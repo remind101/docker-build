@@ -51,12 +51,5 @@ dependencies:
     - curl https://raw.githubusercontent.com/remind101/docker-build/master/docker-build > /home/ubuntu/bin/docker-build
     - chmod +x /home/ubuntu/bin/docker-build
   override:
-    - docker-build build
-
-deployment:
-  hub: 
-    branch: /.*/
-    commands:
-      - docker-build push
-      - docker images
+    - docker-build
 ```
