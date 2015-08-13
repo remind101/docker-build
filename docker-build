@@ -22,6 +22,14 @@ build() {
   docker build --no-cache -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
   docker tag "$repo" "${repo}:${branch}"
+  
+  # Add git tags
+  export GIT_TAGS="$(git show-ref | grep $CIRCLE_SHA1 | grep "tag" | awk '{split($2,a,"/");print a[3]}')"
+  if [ $GIT_TAGS ]
+    while read -r tag; do
+      docker tag "$repo" "${repo}:${tag}"
+    done <<< "$GIT_TAGS"
+  fi
 }
 
 # Push pushes all of the built docker images.
