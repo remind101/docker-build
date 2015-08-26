@@ -19,14 +19,22 @@ usage() {
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
   declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
+  declare tag=`git describe --tags --exact-match $CIRCLE_SHA1 2>/dev/null`
   docker build --no-cache -t "$repo" .
   docker tag "$repo" "${repo}:${sha}"
   docker tag "$repo" "${repo}:${branch}"
+  if [ -n "$tag" ]; then
+    docker tag "$repo" "${repo}:${tag}"
+  fi
 }
 
 # Push pushes all of the built docker images.
 push() {
-  declare repo="$1"
+  declare repo="$1" registry="$2"
+
+  if [ -n "$registry" ]; then
+    repo=$registry/$repo
+  fi
 
   if [ -z "$DOCKER_EMAIL" ] || [ -z "$DOCKER_USER" ] || [ -z "$DOCKER_PASS" ]; then
     usage
@@ -41,7 +49,7 @@ case "$1" in
     build "$REPO"
     ;;
   "push")
-    push "$REPO"
+    push "$REPO" "$DOCKER_REGISTRY"
     ;;
   *)
     usage
