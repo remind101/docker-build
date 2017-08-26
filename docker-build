@@ -23,15 +23,21 @@ usage() {
   exit 1
 }
 
+# Performs a docker pull, and outputs the image reference to stdout if successfull
+docker_pull() {
+  local ref="$1"
+  docker pull "$ref" 1>&2 && echo "$ref"
+}
+
 pull() {
   local repo="$1"
-  docker pull "$repo:$BRANCH" || docker pull "$repo:master" || docker pull "$repo:latest" || true
+  docker_pull "$repo:$BRANCH" || docker_pull "$repo:master" || docker_pull "$repo:latest" || echo "$repo"
 }
 
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
-  local repo="$1"
-  docker build --cache-from "$repo" -t "$repo" -t "$repo:$SHA" -t "$repo:$BRANCH" .
+  local repo="$1" cache="$2"
+  docker build --cache-from "$cache" -t "$repo" -t "$repo:$SHA" -t "$repo:$BRANCH" .
 }
 
 # Push pushes all of the built docker images.
@@ -40,9 +46,14 @@ push() {
   docker push "$repo"
 }
 
+run() {
+  local repo="$1"
+  build "$repo" "$(pull "$repo")" && push "$repo"
+}
+
 case "$1" in
   pull) pull "$REPO" ;;
   build) build "$REPO" ;;
   push) push "$REPO" ;;
-  *) pull "$REPO" && build "$REPO" && push "$REPO" ;;
+  *) run "$REPO" ;;
 esac
