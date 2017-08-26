@@ -43,8 +43,6 @@ To use this script, merge the following in to your `circle.yml`:
 ```yml
 jobs:
   docker_image:
-    <<: *ALL_JOB_COMMON
-
     docker:
       - image: remind101/docker-build
     steps:
