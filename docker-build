@@ -44,5 +44,5 @@ case "$1" in
   pull) pull "$REPO" ;;
   build) build "$REPO" ;;
   push) push "$REPO" ;;
-  *) usage ;;
+  *) pull "$REPO" && build "$REPO" && push "$REPO" ;;
 esac
