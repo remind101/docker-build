@@ -2,48 +2,58 @@
 
 set -e
 
-# The docker repo.
-REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+if [ ! -z "$CIRCLECI" ]; then
+  REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+  BRANCH="$CIRCLE_BRANCH"
+  SHA="$CIRCLE_SHA1"
+else
+  >&2 echo "This script only works on CircleCI right now."
+  exit 1
+fi
 
 # Usage prints the help for this command.
 usage() {
-  echo "Usage:"
-  echo "    docker-build command"
-  echo ""
-  echo "Commands:"
-  echo "    build  Build a docker image from this repo and tag it with the git sha and branch"
-  echo "    push   Push the built image to the docker registry. \$DOCKER_EMAIL, \$DOCKER_USER, and \$DOCKER_PASS are required"
+  >&2 echo "Usage:"
+  >&2 echo "    docker-build command"
+  >&2 echo ""
+  >&2 echo "Commands:"
+  >&2 echo "    pull   Attempt to pull the latest cache tag to build a layer cache"
+  >&2 echo "    build  Build a docker image from this repo and tag it with the git sha and branch"
+  >&2 echo "    push   Push the built image to the docker registry."
   exit 1
+}
+
+# Performs a docker pull, and outputs the image reference to stdout if successfull
+docker_pull() {
+  local ref="$1"
+  docker pull "$ref" 1>&2 && echo "$ref"
+}
+
+pull() {
+  local repo="$1"
+  docker_pull "$repo:$BRANCH" || docker_pull "$repo:master" || docker_pull "$repo:latest" || echo "$repo"
 }
 
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
-  declare repo="$1" sha="$CIRCLE_SHA1" branch="$CIRCLE_BRANCH"
-  docker build --no-cache -t "$repo" .
-  docker tag "$repo" "${repo}:${sha}"
-  docker tag "$repo" "${repo}:${branch}"
+  local repo="$1" cache="$2"
+  docker build --cache-from "$cache" -t "$repo" -t "$repo:$SHA" -t "$repo:$BRANCH" .
 }
 
 # Push pushes all of the built docker images.
 push() {
-  declare repo="$1"
-
-  if [ -z "$DOCKER_EMAIL" ] || [ -z "$DOCKER_USER" ] || [ -z "$DOCKER_PASS" ]; then
-    usage
-  fi
-
-  docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS"
+  local repo="$1"
   docker push "$repo"
 }
 
+run() {
+  local repo="$1"
+  build "$repo" "$(pull "$repo")" && push "$repo"
+}
+
 case "$1" in
-  "build")
-    build "$REPO"
-    ;;
-  "push")
-    push "$REPO"
-    ;;
-  *)
-    usage
-    ;;
+  pull) pull "$REPO" ;;
+  build) build "$REPO" ;;
+  push) push "$REPO" ;;
+  *) run "$REPO" ;;
 esac

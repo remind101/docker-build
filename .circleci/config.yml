@@ -1,0 +1,17 @@
+version: 2
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - docker_image
+
+jobs:
+  docker_image:
+    docker:
+      - image: remind101/docker-build:dd4aff6469c6b8db8b5a9f65e4ff0635672267a2
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run: docker-build
