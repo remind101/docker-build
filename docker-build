@@ -6,6 +6,7 @@ if [ ! -z "$CIRCLECI" ]; then
   REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
   BRANCH="$CIRCLE_BRANCH"
   SHA="$CIRCLE_SHA1"
+  TAG="$CIRCLE_TAG"
 else
   >&2 echo "This script only works on CircleCI right now."
   exit 1
@@ -18,7 +19,7 @@ usage() {
   >&2 echo ""
   >&2 echo "Commands:"
   >&2 echo "    pull   Attempt to pull the latest cache tag to build a layer cache"
-  >&2 echo "    build  Build a docker image from this repo and tag it with the git sha and branch"
+  >&2 echo "    build  Build a docker image from this repo and tag it with the git sha and branch digest"
   >&2 echo "    push   Push the built image to the docker registry."
   exit 1
 }
@@ -38,6 +39,9 @@ pull() {
 build() {
   local repo="$1" cache="$2"
   docker build --cache-from "$cache" -t "$repo" -t "$repo:$SHA" -t "$repo:$BRANCH" .
+  if [ ! -z "$TAG" ]; then
+    docker tag "$repo:$SHA" "$repo:$TAG"
+  fi
 }
 
 # Push pushes all of the built docker images.

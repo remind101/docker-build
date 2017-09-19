@@ -9,7 +9,7 @@ workflows:
 jobs:
   docker_image:
     docker:
-      - image: remind101/docker-build:dd4aff6469c6b8db8b5a9f65e4ff0635672267a2
+      - image: remind101/docker-build@sha256:293984f8ff69d509b3ce9f00e27e89ecc3ae7b4eb6e629cf4b77931749c0cc2e
     steps:
       - checkout
       - setup_remote_docker
