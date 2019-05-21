@@ -9,9 +9,10 @@ workflows:
 jobs:
   docker_image:
     docker:
-      - image: remind101/docker-build@sha256:72b3e45ca70b576a9722f70b2e188c75533d98040508be6a550101b4fb430543
-    environment: 
-      NO_EXTRA_TAGS: "true"
+      - image: remind101/docker-build@sha256:b2b7a582c803e21a835c496de269f49fbc069d21b21000cfd44e089241483c75
+      # example on how to avoid creating branch and commit tags in docker hub.
+      # environment: 
+      #   NO_EXTRA_TAGS: "true"
     steps:
       - checkout
       - setup_remote_docker
