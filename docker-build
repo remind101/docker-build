@@ -11,6 +11,13 @@ else
   exit 1
 fi
 
+if [[ -n "$NO_EXTRA_TAGS" ]]
+then
+    extra_tags=false
+else
+    extra_tags=true
+fi
+
 # Usage prints the help for this command.
 usage() {
   >&2 echo "Usage:"
@@ -37,7 +44,12 @@ pull() {
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
   local repo="$1" cache="$2"
-  docker build --cache-from "$cache" -t "$repo" -t "$repo:$SHA" -t "$repo:$BRANCH" .
+  if [ "$extra_tags" = true ];
+    then
+      docker build --cache-from "$cache" -t "$repo" -t "$repo:$SHA" -t "$repo:$BRANCH" .
+  else
+      docker build --cache-from "$cache" -t "$repo" .
+  fi
 }
 
 # Push pushes all of the built docker images.
