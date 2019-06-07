@@ -46,10 +46,14 @@ build() {
   local repo="$1" cache="$2"
   if [ "$extra_tags" = true ];
     then
-      docker build --cache-from "$cache" -t "$repo" -t "$repo:$SHA" -t "$repo:$BRANCH" .
+      tag_flags="-t $repo -t $repo:$SHA -t $repo:$BRANCH"
+  elif [ "$BRANCH" = "master" ];
+    then
+      tag_flags="-t $repo -t $repo:$BRANCH"
   else
-      docker build --cache-from "$cache" -t "$repo" .
+      tag_flags="-t $repo"
   fi
+  docker build --cache-from "$cache" $tag_flags .
 }
 
 # Push pushes all of the built docker images.
