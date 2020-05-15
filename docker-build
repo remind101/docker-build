@@ -53,7 +53,7 @@ build() {
   else
       tag_flags="-t $repo"
   fi
-  docker build --cache-from "$cache" $tag_flags .
+  docker build --build-arg GIT_COMMIT=$SHA --build-arg GIT_BRANCH=$BRANCH --cache-from "$cache" $tag_flags .
 }
 
 # Push pushes all of the built docker images.
