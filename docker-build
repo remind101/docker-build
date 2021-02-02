@@ -1,33 +1,42 @@
 #!/bin/sh
+# shellcheck shell=dash
 
 set -e
 
-if [ ! -z "$CIRCLECI" ]; then
-  REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
-  BRANCH="$CIRCLE_BRANCH"
-  SHA="$CIRCLE_SHA1"
-else
-  >&2 echo "This script only works on CircleCI right now."
-  exit 1
-fi
-
-if [[ -n "$NO_EXTRA_TAGS" ]]
-then
-    extra_tags=false
-else
-    extra_tags=true
-fi
-
 # Usage prints the help for this command.
 usage() {
-  >&2 echo "Usage:"
-  >&2 echo "    docker-build command"
-  >&2 echo ""
-  >&2 echo "Commands:"
-  >&2 echo "    pull   Attempt to pull the latest cache tag to build a layer cache"
-  >&2 echo "    build  Build a docker image from this repo and tag it with the git sha and branch"
-  >&2 echo "    push   Push the built image to the docker registry."
-  exit 1
+  >&2 cat <<EOF
+Usage:
+    docker-build [OPTIONS]
+    docker-build COMMAND [OPTIONS]
+
+Docker CLI wrapper that injects defaults for a more consistent
+CI process. Currently only works in CircleCI.
+
+Running docker-build with no COMMAND will do build-with-cache
+and then push automatically
+
+Any OPTIONS specified will be passed to 'docker build.
+
+Commands:
+    pull              Attempt to pull the latest cache tag to build a layer cache
+    build             Build a docker image from this repo and tag it with the git sha and branch
+    build-with-cache  Build with automatic --cache-from
+    push              Push the built image to the docker registry.
+
+Examples:
+    Basic usage:
+      $ docker-build
+
+    Build, but don't tag with branch and SHA1 tags:
+      $ NO_EXTRA_TAGS=1 docker-build build
+
+    Build and push an image with a multi-stage Dockerfile:
+      $ docker-build --target main
+
+    Build with buildkit (Docker >= 19.03):
+      $ DOCKER_BUILDKIT=1 docker-build
+EOF
 }
 
 # Performs a docker pull, and outputs the image reference to stdout if successfull
@@ -38,22 +47,61 @@ docker_pull() {
 
 pull() {
   local repo="$1"
-  docker_pull "$repo:$BRANCH" || docker_pull "$repo:master" || docker_pull "$repo:latest" || echo "$repo"
+  docker_pull "$repo:$BRANCH" \
+    || docker_pull "$repo:master" \
+    || docker_pull "$repo:latest" \
+    || echo "$repo"
 }
 
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
-  local repo="$1" cache="$2"
+  local repo="$1"
+  shift
+  args=""
   if [ "$extra_tags" = true ];
     then
-      tag_flags="-t $repo -t $repo:$SHA -t $repo:$BRANCH"
+      args="-t $repo -t $repo:$SHA -t $repo:$BRANCH"
   elif [ "$BRANCH" = "master" ];
     then
-      tag_flags="-t $repo -t $repo:$BRANCH"
+      args="-t $repo -t $repo:$BRANCH"
   else
-      tag_flags="-t $repo"
+      args="-t $repo"
   fi
-  docker build --build-arg GIT_COMMIT=$SHA --build-arg GIT_BRANCH=$BRANCH --cache-from "$cache" $tag_flags .
+  if [ "$DOCKER_BUILDKIT" = "1" ]; then
+    # Always include BuildKit inline cache when BuildKit is enabled, this
+    # allows --cache-from to work for multi-stage builds.
+    # BuildKit's default progress output is nice in interactive terminals but
+    # not so much in CI where we want simple sequential logs, so we also always
+    # set progress to plain with BuildKit.
+    args="$args --build-arg BUILDKIT_INLINE_CACHE=1 --progress plain"
+  fi
+
+  # Quoting $args will break this since ash doesn't support field splitting on
+  # anything other than "$@" - disabling shellcheck so that we don't get a
+  # warning.
+  # shellcheck disable=SC2086
+  docker build \
+    --build-arg "GIT_COMMIT=$SHA" \
+    --build-arg "GIT_BRANCH=$BRANCH" \
+    $args \
+    "$@" \
+    .
+}
+
+build_with_cache() {
+  local repo="$1"
+  shift
+  if [ "$DOCKER_BUILDKIT" = "1" ]; then
+    build "$repo" \
+      --cache-from "$repo:$BRANCH" \
+      --cache-from "$repo:master" \
+      --cache-from "$repo:latest" \
+      "$@"
+  else
+    build "$repo" \
+      --cache-from "$(pull "$repo")" \
+      "$@"
+  fi
 }
 
 # Push pushes all of the built docker images.
@@ -64,12 +112,49 @@ push() {
 
 run() {
   local repo="$1"
-  build "$repo" "$(pull "$repo")" && push "$repo"
+  shift
+  build_with_cache "$repo" "$@" && push "$repo"
 }
 
+# Main -------------------------------------------------
+
 case "$1" in
+  help|-h|--help) usage; exit 1 ;;
+esac
+
+if [ -n "$CIRCLECI" ]; then
+  REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+  BRANCH="$CIRCLE_BRANCH"
+  SHA="$CIRCLE_SHA1"
+else
+  >&2 echo "This script only works on CircleCI right now."
+  exit 1
+fi
+
+if [ "$DOCKER_BUILDKIT" = 1 ]; then
+  docker_version="$(docker version -f "{{.Server.Version}}")"
+  docker_version_maj="$(echo "$docker_version" | cut -d'.' -f 1)"
+  docker_version_min="$(echo "$docker_version" | cut -d'.' -f 2)"
+  if [ "$docker_version_maj" -lt 19 ] \
+    || { [ "$docker_version_maj" -eq 19 ] && [ "$docker_version_min" -lt 3 ]; }; then
+    >&2 echo "Docker engine version ${docker_version} is too old, must be >= 19.03 to use buildkit"
+    exit 1
+  fi
+fi
+
+if [ -n "$NO_EXTRA_TAGS" ]
+then
+    extra_tags=false
+else
+    extra_tags=true
+fi
+
+
+cmd="$1"
+case "$cmd" in
   pull) pull "$REPO" ;;
-  build) build "$REPO" ;;
+  build) shift; build "$REPO" "$@" ;;
+  build-with-cache) shift; build_with_cache "$REPO" "$@" ;;
   push) push "$REPO" ;;
-  *) run "$REPO" ;;
+  *) run "$REPO" "$@" ;;
 esac

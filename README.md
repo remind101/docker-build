@@ -51,3 +51,24 @@ jobs:
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
       - run: docker-build
 ```
+
+#### BuildKit Support
+
+To build with BuildKit and leverage improvements to `--cache-from` and inline
+cache metadata, set `DOCKER_BUILDKIT=1` in the environment and make sure you're
+using at least Docker 19.03:
+
+```yml
+jobs:
+  docker_image:
+    docker:
+      - image: remind101/docker-build
+    environment:
+      DOCKER_BUILDKIT: 1
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 19.03.13
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run: docker-build
+```
