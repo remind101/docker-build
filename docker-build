@@ -14,15 +14,29 @@ Docker CLI wrapper that injects defaults for a more consistent
 CI process. Currently only works in CircleCI.
 
 Running docker-build with no COMMAND will do build-with-cache
-and then push automatically
+and then push automatically.
 
-Any OPTIONS specified will be passed to 'docker build.
+Any OPTIONS specified will be passed to 'docker build' (if applicable).
 
 Commands:
     pull              Attempt to pull the latest cache tag to build a layer cache
-    build             Build a docker image from this repo and tag it with the git sha and branch
+    build             Build a docker image from this repo and tag it with the git SHA1 and branch
     build-with-cache  Build with automatic --cache-from
-    push              Push the built image to the docker registry.
+    push              Push the built image to the docker registry
+
+Tags:
+    The following tags will be built and pushed by default:
+      \$REPO:\$SHA1
+      \$REPO:\$BRANCH
+      \$REPO:latest
+
+    If NO_EXTRA_TAGS is set, only "latest" will be used, unless the branch is
+    "master", in which case it will also tag "master".
+
+    Cache will be used following tags if they exist:
+      \$REPO:\$BRANCH
+      \$REPO:master
+      \$REPO:latest
 
 Examples:
     Basic usage:
@@ -46,27 +60,18 @@ docker_pull() {
 }
 
 pull() {
-  local repo="$1"
-  docker_pull "$repo:$BRANCH" \
-    || docker_pull "$repo:master" \
-    || docker_pull "$repo:latest" \
-    || echo "$repo"
+  docker_pull "$REPO:$BRANCH" \
+    || docker_pull "$REPO:master" \
+    || docker_pull "$REPO:latest" \
+    || echo "$REPO"
 }
 
 # Build builds the docker image and tags it with the git sha and branch.
 build() {
-  local repo="$1"
-  shift
-  args=""
-  if [ "$extra_tags" = true ];
-    then
-      args="-t $repo -t $repo:$SHA -t $repo:$BRANCH"
-  elif [ "$BRANCH" = "master" ];
-    then
-      args="-t $repo -t $repo:$BRANCH"
-  else
-      args="-t $repo"
-  fi
+  local args=""
+  for tag in $TAGS; do
+    args="$args -t $REPO:$tag"
+  done
   if [ "$DOCKER_BUILDKIT" = "1" ]; then
     # Always include BuildKit inline cache when BuildKit is enabled, this
     # allows --cache-from to work for multi-stage builds.
@@ -89,31 +94,28 @@ build() {
 }
 
 build_with_cache() {
-  local repo="$1"
-  shift
   if [ "$DOCKER_BUILDKIT" = "1" ]; then
-    build "$repo" \
-      --cache-from "$repo:$BRANCH" \
-      --cache-from "$repo:master" \
-      --cache-from "$repo:latest" \
+    build \
+      --cache-from "$REPO:$BRANCH" \
+      --cache-from "$REPO:master" \
+      --cache-from "$REPO:latest" \
       "$@"
   else
-    build "$repo" \
-      --cache-from "$(pull "$repo")" \
+    build \
+      --cache-from "$(pull)" \
       "$@"
   fi
 }
 
 # Push pushes all of the built docker images.
 push() {
-  local repo="$1"
-  docker push "$repo"
+  for tag in $TAGS; do
+    docker push "$REPO:$tag"
+  done
 }
 
 run() {
-  local repo="$1"
-  shift
-  build_with_cache "$repo" "$@" && push "$repo"
+  build_with_cache "$@" && push
 }
 
 # Main -------------------------------------------------
@@ -142,19 +144,26 @@ if [ "$DOCKER_BUILDKIT" = 1 ]; then
   fi
 fi
 
-if [ -n "$NO_EXTRA_TAGS" ]
-then
-    extra_tags=false
+if [ -n "$NO_EXTRA_TAGS" ]; then
+  if [ "$BRANCH" = "master" ]; then
+    TAGS="$BRANCH latest"
+  else
+    TAGS="latest"
+  fi
 else
-    extra_tags=true
+  TAGS="$SHA $BRANCH latest"
 fi
-
 
 cmd="$1"
 case "$cmd" in
-  pull) pull "$REPO" ;;
-  build) shift; build "$REPO" "$@" ;;
-  build-with-cache) shift; build_with_cache "$REPO" "$@" ;;
-  push) push "$REPO" ;;
-  *) run "$REPO" "$@" ;;
+  pull)
+    shift; pull ;;
+  build)
+    shift; build "$@" ;;
+  build-with-cache)
+    shift; build_with_cache "$@" ;;
+  push)
+    shift; push ;;
+  *)
+    run "$@" ;;
 esac
