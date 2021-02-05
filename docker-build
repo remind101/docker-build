@@ -60,7 +60,7 @@ docker_pull() {
 }
 
 pull() {
-  docker_pull "$REPO:$BRANCH" \
+  docker_pull "$REPO:$BRANCH_TAG" \
     || docker_pull "$REPO:master" \
     || docker_pull "$REPO:latest" \
     || echo "$REPO"
@@ -96,7 +96,7 @@ build() {
 build_with_cache() {
   if [ "$DOCKER_BUILDKIT" = "1" ]; then
     build \
-      --cache-from "$REPO:$BRANCH" \
+      --cache-from "$REPO:$BRANCH_TAG" \
       --cache-from "$REPO:master" \
       --cache-from "$REPO:latest" \
       "$@"
@@ -146,12 +146,17 @@ fi
 
 if [ -n "$NO_EXTRA_TAGS" ]; then
   if [ "$BRANCH" = "master" ]; then
-    TAGS="$BRANCH latest"
+    TAGS="master latest"
   else
     TAGS="latest"
   fi
 else
-  TAGS="$SHA $BRANCH latest"
+  # Docker tags can't contain slashes, so if the branch name contains then,
+  # replace them with periods. For example, "foo/bar-baz" becomes
+  # "foo.bar-baz". Branch names shouldn't contain spaces, but also replace
+  # those with underscores just in case, since it might cause issues.
+  BRANCH_TAG="$(echo "$BRANCH" | sed -e 's/\//./g' -e 's/ /_/g')"
+  TAGS="$SHA $BRANCH_TAG latest"
 fi
 
 cmd="$1"
