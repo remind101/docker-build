@@ -1,5 +1,4 @@
-FROM docker:17.05.0-ce-git
-MAINTAINER Christophe Furmaniak <christophe.furmaniak@gmail.com>
+FROM docker:19.03-git
 
 ENTRYPOINT /bin/sh
 
