@@ -12,20 +12,23 @@ workflows:
 jobs:
   lint:
     docker:
-      - image: alpine
+      # We need this to be less than 3.14 because 3.14 introduces
+      # https://wiki.alpinelinux.org/wiki/Release_Notes_for_Alpine_3.14.0#faccessat2,
+      # which breaks with older versions of docker. The underlying CircleCI
+      # runtime is still on Docker 19.
+      - image: library/alpine:3.13
     steps:
       - checkout
-      - run: apk add make shellcheck
-      - run: make lint
+      - run: apk --update add make shellcheck
+      - run: |
+          make lint
 
   docker_image:
     docker:
       - image: remind101/docker-build@sha256:b2b7a582c803e21a835c496de269f49fbc069d21b21000cfd44e089241483c75
-      # example on how to avoid creating branch and commit tags in docker hub.
-      # environment: 
-      #   NO_EXTRA_TAGS: "true"
     steps:
       - checkout
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 20.10.6
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
       - run: docker-build
