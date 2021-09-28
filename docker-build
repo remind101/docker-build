@@ -48,6 +48,9 @@ Examples:
     Build and push an image with a multi-stage Dockerfile:
       $ docker-build --target main
 
+    Build with a specific path:
+      $ DOCKER_BUILD_PATH=./site docker-build build
+
     Build with buildkit (Docker >= 19.03):
       $ DOCKER_BUILDKIT=1 docker-build
 EOF
@@ -90,7 +93,7 @@ build() {
     --build-arg "GIT_BRANCH=$BRANCH" \
     $args \
     "$@" \
-    .
+    "$DOCKER_BUILD_PATH"
 }
 
 build_with_cache() {
@@ -152,6 +155,10 @@ if [ -n "$NO_EXTRA_TAGS" ]; then
   fi
 else
   TAGS="$SHA $BRANCH latest"
+fi
+
+if [ -z "$DOCKER_BUILD_PATH" ]; then
+  DOCKER_BUILD_PATH=.
 fi
 
 cmd="$1"
