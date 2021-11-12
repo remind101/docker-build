@@ -36,6 +36,7 @@ Tags:
     Cache will be used following tags if they exist:
       \$REPO:\$BRANCH
       \$REPO:master
+      \$REPO:main
       \$REPO:latest
 
 Examples:
@@ -64,6 +65,7 @@ docker_pull() {
 
 pull() {
   docker_pull "$REPO:$BRANCH" \
+    || docker_pull "$REPO:main" \
     || docker_pull "$REPO:master" \
     || docker_pull "$REPO:latest" \
     || echo "$REPO"
@@ -101,6 +103,7 @@ build_with_cache() {
     build \
       --cache-from "$REPO:$BRANCH" \
       --cache-from "$REPO:master" \
+      --cache-from "$REPO:main" \
       --cache-from "$REPO:latest" \
       "$@"
   else
