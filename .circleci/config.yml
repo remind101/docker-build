@@ -6,6 +6,8 @@ workflows:
     jobs:
       - lint
       - docker_image:
+          context:
+            - docker-hub
           requires:
             - lint
 
