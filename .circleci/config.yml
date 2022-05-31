@@ -27,10 +27,13 @@ jobs:
 
   docker_image:
     docker:
-      - image: remind101/docker-build@sha256:b2b7a582c803e21a835c496de269f49fbc069d21b21000cfd44e089241483c75
+      # https://github.com/remind101/docker-build/commit/060f016731f0b554c6648669703978c895eb8ca5
+      - image: remind101/docker-build@sha256:3c48340d29d6d5aa46773bae93c7eb3b2d994ecd25e02707119dccd7b914967e
+    environment:
+      DOCKER_BUILDKIT: 1
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.6
-      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+          version: 20.10.12
+      - run: printenv DOCKER_PASS | docker login -u "$DOCKER_USER" --password-stdin
       - run: docker-build

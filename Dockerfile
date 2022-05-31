@@ -1,6 +1,6 @@
-FROM docker:20.10.7
+FROM docker:20.10.12
 
-ENTRYPOINT /bin/sh
+ENTRYPOINT ["/bin/sh"]
 
 RUN apk --no-cache add \
     docker-compose \
