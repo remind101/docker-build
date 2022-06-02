@@ -132,6 +132,32 @@ run() {
   build_with_cache "$@" && push
 }
 
+# Registry-specific commands ---------------------------
+
+hub_login() {
+  printenv DOCKER_PASS | docker login --username "$DOCKER_USER" --password-stdin
+}
+
+aws_ecr_login() {
+  aws ecr get-login-password --region "$AWS_REGION" \
+  | docker login --username AWS --password-stdin "$AWS_ECR_ACCOUNT_URL"
+}
+
+aws_ecr_create_repo() {
+  aws ecr describe-repositories \
+    --region "$AWS_REGION" \
+    --repository-name "$REPO" \
+    >/dev/null 2>&1 \
+    || aws ecr create-repository \
+    --region "$AWS_REGION" \
+    --repository-name "$REPO" \
+    --image-scanning-configuration scanOnPush=true
+}
+
+aws_ecr_push() {
+  push_to_registry "$AWS_ECR_ACCOUNT_URL"
+}
+
 # Main -------------------------------------------------
 
 case "${1:-}" in
@@ -182,6 +208,14 @@ case "$cmd" in
     shift; push ;;
   push-to-registry)
     shift; push_to_registry "$@" ;;
+  hub-login)
+    shift; hub_login ;;
+  aws-ecr-login)
+    shift; aws_ecr_login ;;
+  aws-ecr-create-repo)
+    shift; aws_ecr_create_repo ;;
+  aws-ecr-push)
+    shift; aws_ecr_push ;;
   *)
     run "$@" ;;
 esac
