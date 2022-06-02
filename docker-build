@@ -120,6 +120,14 @@ push() {
   done
 }
 
+push_to_registry() {
+  local registry="$1"
+  for tag in $TAGS; do
+    docker tag "$REPO:$tag" "$registry/$REPO:$tag"
+    docker push "$registry/$REPO:$tag"
+  done
+}
+
 run() {
   build_with_cache "$@" && push
 }
@@ -172,6 +180,8 @@ case "$cmd" in
     shift; build_with_cache "$@" ;;
   push)
     shift; push ;;
+  push-to-registry)
+    shift; push_to_registry "$@" ;;
   *)
     run "$@" ;;
 esac
