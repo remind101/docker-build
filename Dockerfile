@@ -1,9 +1,8 @@
-FROM docker:20.10.12
+FROM docker:20.10.16
 
 ENTRYPOINT ["/bin/sh"]
 
 RUN apk --no-cache add \
-    docker-compose \
     git \
     make
 
