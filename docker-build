@@ -13,8 +13,14 @@ Usage:
 Docker CLI wrapper that injects defaults for a more consistent
 CI process. Currently only works in CircleCI.
 
-Running docker-build with no COMMAND will do build-with-cache
-and then push automatically.
+Running docker-build with no COMMAND will do the following automatically:
+1. Log in to Docker Hub
+2. Build with automatic cache-from
+3. Push to the standard set of tags on Docker Hub
+4. If ECR context vars are present:
+    a. Create an ECR repo if it doesn't exist
+    b. Log in to ECR
+    c. Push to the standard set of tags on ECR
 
 Any OPTIONS specified will be passed to 'docker build' (if applicable).
 
@@ -22,12 +28,20 @@ Commands:
     pull              Attempt to pull the latest cache tag to build a layer cache
     build             Build a docker image from this repo and tag it with the git SHA1 and branch
     build-with-cache  Build with automatic --cache-from
-    push              Push the built image to the docker registry
+    push              Push the built image(s) to the docker registry
+    push-to-registry  Push the build image(s) to the given registry.
+    hub-login         Automatically log in to docker hub using DOCKER_USER and DOCKER_PASS
+
+    aws-ecr-login                         Automatically log in to ECR using AWS_ECR_ACCOUNT_URL and AWS_REGION
+    aws-ecr-create-repo                   Automatically create an ECR repo in AWS_REGION if it doesn't already exist
+    aws-ecr-put-default-lifecycle-policy  Put the default lifecycle policy to the ECR repo
+    aws-ecr-push                          Push the build image(s) to ECr.
 
 Tags:
     The following tags will be built and pushed by default:
       \$REPO:\$SHA1
       \$REPO:\$BRANCH
+      \$REPO:\$BRANCH-\$BUILD
       \$REPO:latest
 
     If NO_EXTRA_TAGS is set, only "latest" will be used, unless the branch is
@@ -116,6 +130,7 @@ build_with_cache() {
 # Push pushes all of the built docker images.
 push() {
   for tag in $TAGS; do
+    echo "pushing $REPO:$tag"
     docker push "$REPO:$tag"
   done
 }
@@ -123,13 +138,10 @@ push() {
 push_to_registry() {
   local registry="$1"
   for tag in $TAGS; do
+    echo "pushing $registry/$REPO:$tag"
     docker tag "$REPO:$tag" "$registry/$REPO:$tag"
     docker push "$registry/$REPO:$tag"
   done
-}
-
-run() {
-  build_with_cache "$@" && push
 }
 
 # Registry-specific commands ---------------------------
@@ -154,8 +166,37 @@ aws_ecr_create_repo() {
     --image-scanning-configuration scanOnPush=true
 }
 
+aws_ecr_put_lifecycle_policy() {
+  aws ecr put-lifecycle-policy \
+    --region "$AWS_REGION" \
+    --repository-name "$REPO" \
+    --lifecycle-policy-text "$1"
+}
+
+aws_ecr_put_default_lifecycle_policy() {
+  aws_ecr_put_lifecycle_policy "$(cat /default-ecr-lifecycle-policy.json)"
+}
+
 aws_ecr_push() {
   push_to_registry "$AWS_ECR_ACCOUNT_URL"
+}
+
+# Composite commands -----------------------------------
+
+run() {
+  # Login to docker hub, build, and push.
+  hub_login
+  build_with_cache "$@"
+  push
+
+  # Push to ECR if the context is set.
+  if [ -n "${AWS_ECR_ACCOUNT_URL:-}" ]; then
+    aws_ecr_create_repo
+    aws_ecr_login
+    aws_ecr_push
+  else
+    >&2 echo "WARNING: AWS_ECR_ACCOUNT_URL not set, not pushing to ECR"
+  fi
 }
 
 # Main -------------------------------------------------
@@ -168,6 +209,7 @@ if [ -n "${CIRCLECI+x}" ]; then
   REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
   BRANCH="$CIRCLE_BRANCH"
   SHA="$CIRCLE_SHA1"
+  BUILD="$CIRCLE_BUILD_NUM"
 else
   >&2 echo "This script only works on CircleCI right now."
   exit 1
@@ -186,12 +228,12 @@ fi
 
 if [ -n "${NO_EXTRA_TAGS+x}" ]; then
   if [ "$BRANCH" = "master" ]; then
-    TAGS="$BRANCH latest"
+    TAGS="$BRANCH ${BRANCH}-${BUILD} latest"
   else
     TAGS="latest"
   fi
 else
-  TAGS="$SHA $BRANCH latest"
+  TAGS="$SHA $BRANCH ${BRANCH}-${BUILD} latest"
 fi
 
 DOCKER_BUILD_PATH="${DOCKER_BUILD_PATH:-.}"
@@ -214,6 +256,8 @@ case "$cmd" in
     shift; aws_ecr_login ;;
   aws-ecr-create-repo)
     shift; aws_ecr_create_repo ;;
+  aws-ecr-put-default-lifecycle-policy)
+    shift; aws_ecr_put_default_lifecycle_policy ;;
   aws-ecr-push)
     shift; aws_ecr_push ;;
   *)

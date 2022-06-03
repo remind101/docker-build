@@ -8,4 +8,5 @@ RUN apk --no-cache add \
     make \
     aws-cli
 
+COPY default-ecr-lifecycle-policy.json /default-ecr-lifecycle-policy.json
 COPY docker-build /usr/local/bin/docker-build
