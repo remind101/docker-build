@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "rulePriority": 1,
+      "description": "Keep latest master/main image",
+      "selection": {
+        "tagStatus": "tagged",
+        "tagPrefixList": ["master", "main"],
+        "countType": "imageCountMoreThan",
+        "countNumber": 8000
+      },
+      "action": {
+        "type": "expire"
+      }
+    },
+    {
+      "rulePriority": 2,
+      "description": "Expire all images older than 90 days",
+      "selection": {
+        "countType": "sinceImagePushed",
+        "countNumber": 90,
+        "countUnit": "days"
+      },
+      "action": {
+        "type": "expire"
+      }
+    }
+  ]
+}
