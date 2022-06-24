@@ -260,6 +260,9 @@ case "$cmd" in
     shift; aws_ecr_put_default_lifecycle_policy ;;
   aws-ecr-push)
     shift; aws_ecr_push ;;
-  *)
+  "")
     run "$@" ;;
+  *)
+    >&2 echo "Unknown command: $cmd"
+    exit 1
 esac
