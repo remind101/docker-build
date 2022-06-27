@@ -189,13 +189,14 @@ run() {
   build_with_cache "$@"
   push
 
-  # Push to ECR if the context is set.
-  if [ -n "${AWS_ECR_ACCOUNT_URL:-}" ]; then
+  if [ "$ECR" = true ]; then
+    if [ "${AWS_ECR_ACCOUNT_URL:-}" = "" ]; then
+      >&2 echo "AWS_ECR_ACCOUNT_URL is not set; did you forget to include the aws-ecr context?"
+      exit 1
+    fi
     aws_ecr_create_repo
     aws_ecr_login
     aws_ecr_push
-  else
-    >&2 echo "WARNING: AWS_ECR_ACCOUNT_URL not set, not pushing to ECR"
   fi
 }
 
@@ -238,8 +239,13 @@ fi
 
 DOCKER_BUILD_PATH="${DOCKER_BUILD_PATH:-.}"
 
-cmd="${1:-}"
-case "$cmd" in
+ECR=false
+if [ "${1:-}" = "--ecr" ]; then
+  shift
+  ECR=true
+fi
+
+case "${1:-}" in
   pull)
     shift; pull ;;
   build)
@@ -260,6 +266,9 @@ case "$cmd" in
     shift; aws_ecr_put_default_lifecycle_policy ;;
   aws-ecr-push)
     shift; aws_ecr_push ;;
-  *)
+  "")
     run "$@" ;;
+  *)
+    >&2 echo "Unknown command: ${1:-}"
+    exit 1
 esac

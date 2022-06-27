@@ -11,7 +11,7 @@ Running docker-build with no command will do the following automatically:
 1. Log in to Docker Hub
 2. Build with automatic cache-from
 3. Push to the standard set of tags on Docker Hub
-4. If ECR context vars are present:
+4. If `--ecr` is passed:
     1. Create an ECR repo if it doesn't exist
     2. Log in to ECR
     3. Push to the standard set of tags on ECR
@@ -20,7 +20,7 @@ Running docker-build with no command will do the following automatically:
 
 TL;DR put this in `.circleci/config.yml`:
 
-```yml
+```yaml
 version: 2.1
 
 workflows:
@@ -42,7 +42,9 @@ jobs:
       - checkout
       - setup_remote_docker:
           version: 20.10.14
-      - run: docker-build # build, tag and push
+      # build, tag and push to Docker Hub and AWS ECR
+      - run: docker-build --ecr
+      # idempotent put of ECR lifecycle policy
       - run: docker-build aws-ecr-put-default-lifecycle-policy
 ```
 
@@ -81,16 +83,13 @@ jobs:
 
 ## AWS ECR
 
-The `docker-build` script attempts to create and push to ECR repositories if
-the following environment variables are present:
+The `docker-build --ecr` command attempts to create and push to ECR
+repositories if the following environment variables are present:
 
 - `AWS_ECR_ACCOUNT_URL`
 - `AWS_REGION`
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
-
-If `AWS_ECR_ACCOUNT_URL` is not present, the ECR steps will be skipped and a
-warning will be emitted. If any vars are set incorrectly, errors may occur.
 
 A [standard lifecycle policy](default-ecr-lifecycle-policy.json) can also be
 applied using `docker-build aws-ecr-put-default-lifecycle-policy`. This is not
