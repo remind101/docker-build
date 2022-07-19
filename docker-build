@@ -266,6 +266,8 @@ case "${1:-}" in
     shift; aws_ecr_put_default_lifecycle_policy ;;
   aws-ecr-push)
     shift; aws_ecr_push ;;
+  --)
+    shift; run "$@" ;;
   "")
     run "$@" ;;
   *)
