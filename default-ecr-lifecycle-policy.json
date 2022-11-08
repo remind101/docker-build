@@ -2,12 +2,12 @@
   "rules": [
     {
       "rulePriority": 1,
-      "description": "Keep latest master/main image",
+      "description": "Keep a fixed number of master/main images",
       "selection": {
         "tagStatus": "tagged",
         "tagPrefixList": ["master", "main"],
         "countType": "imageCountMoreThan",
-        "countNumber": 8000
+        "countNumber": 1000
       },
       "action": {
         "type": "expire"
@@ -15,11 +15,11 @@
     },
     {
       "rulePriority": 2,
-      "description": "Expire all images older than 90 days",
+      "description": "Only retain a fixed number non-master/main images",
       "selection": {
-        "countType": "sinceImagePushed",
-        "countNumber": 90,
-        "countUnit": "days"
+        "tagStatus": "any",
+        "countType": "imageCountMoreThan",
+        "countNumber": 5000
       },
       "action": {
         "type": "expire"
