@@ -7,17 +7,18 @@ set -eu
 usage() {
   >&2 cat <<EOF
 Usage:
-    docker-build [OPTIONS]
-    docker-build COMMAND [OPTIONS]
+    docker-build [--ecr] [--no-docker-hub] [OPTIONS]
+    docker-build COMMAND [--ecr] [--no-docker-hub] [OPTIONS]
 
 Docker CLI wrapper that injects defaults for a more consistent
 CI process. Currently only works in CircleCI.
 
 Running docker-build with no COMMAND will do the following automatically:
-1. Log in to Docker Hub
-2. Build with automatic cache-from
-3. Push to the standard set of tags on Docker Hub
-4. If ECR context vars are present:
+1. Build with automatic cache-from
+2. Unless --no-docker-hub is set:
+  a. Log in to Docker Hub
+  b. Push to the standard set of tags on Docker Hub
+3. If --ecr is set:
     a. Create an ECR repo if it doesn't exist
     b. Log in to ECR
     c. Push to the standard set of tags on ECR
@@ -184,10 +185,14 @@ aws_ecr_push() {
 # Composite commands -----------------------------------
 
 run() {
-  # Login to docker hub, build, and push.
-  hub_login
+  # Build and push.
   build_with_cache "$@"
-  push
+
+  if [ "$HUB" = true ]; then
+    # Log in to docker hub.
+    hub_login
+    push
+  fi
 
   if [ "$ECR" = true ]; then
     if [ "${AWS_ECR_ACCOUNT_URL:-}" = "" ]; then
@@ -243,6 +248,12 @@ ECR=false
 if [ "${1:-}" = "--ecr" ]; then
   shift
   ECR=true
+fi
+
+HUB=true
+if [ "${1:-}" = "--no-docker-hub" ]; then
+  shift
+  HUB=false
 fi
 
 case "${1:-}" in
