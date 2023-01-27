@@ -1,39 +1,58 @@
-version: 2
+version: 2.1
 
 workflows:
-  version: 2
   build:
     jobs:
-      - lint
-      - docker_image:
+      - build:
+          filters:
+            # Also run for version tags.
+            tags:
+              only: "/^v.*/"
           context:
             - docker-hub
-          requires:
-            - lint
+            - orb-publishing
 
 jobs:
-  lint:
+  build:
     docker:
-      # We need this to be less than 3.14 because 3.14 introduces
-      # https://wiki.alpinelinux.org/wiki/Release_Notes_for_Alpine_3.14.0#faccessat2,
-      # which breaks with older versions of docker. The underlying CircleCI
-      # runtime is still on Docker 19.
-      - image: library/alpine:3.13
-    steps:
-      - checkout
-      - run: apk --update add make shellcheck
-      - run: |
-          make lint
-
-  docker_image:
-    docker:
-      # https://github.com/remind101/docker-build/commit/060f016731f0b554c6648669703978c895eb8ca5
-      - image: remind101/docker-build@sha256:3c48340d29d6d5aa46773bae93c7eb3b2d994ecd25e02707119dccd7b914967e
+      - image: library/alpine:3
     environment:
       DOCKER_BUILDKIT: 1
+      BUILDKIT_PROGRESS: plain
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.12
-      - run: printenv DOCKER_PASS | docker login -u "$DOCKER_USER" --password-stdin
-      - run: docker-build
+          version: 20.10.14
+      - run: apk --update add make shellcheck docker git
+      - run:
+          name: Install CircleCI CLI
+          command: |
+            set -euo pipefail
+            wget "https://github.com/CircleCI-Public/circleci-cli/releases/download/v0.1.23241/circleci-cli_0.1.23241_linux_amd64.tar.gz"
+            echo "304e8547762ac5ba134dcaa6e30657b80ca04a3e9e540d071f4cdb2e34d4bc6c  circleci-cli_0.1.23241_linux_amd64.tar.gz" | sha256sum -c
+            tar -xzf circleci-cli_0.1.23241_linux_amd64.tar.gz
+            mv circleci-cli_0.1.23241_linux_amd64/circleci /usr/bin/circleci
+      - run:
+          name: Lint
+          command: make lint
+      - run:
+          name: Build and push docker image
+          command: |
+            printenv DOCKER_PASS | docker login --username "$DOCKER_USER" --password-stdin
+            make push-docker-image
+      - run:
+          name: Build and publish CircleCI orb
+          command: |
+            export CIRCLECI_CLI_TOKEN="$CIRCLE_TOKEN"
+            make publish-orb
+      - when:
+          condition:
+            matches:
+              pattern: "^v.*"
+              value: "<< pipeline.git.tag >>"
+          steps:
+            - run:
+                name: Publish release version of CircleCI orb
+                command: |
+                  export CIRCLECI_CLI_TOKEN="$CIRCLE_TOKEN"
+                  make publish-orb "ORB_VERSION=${CIRCLE_TAG:1}"
