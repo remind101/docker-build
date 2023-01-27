@@ -1,0 +1,24 @@
+version: 2.1
+
+description: "Automatically builds and pushes Docker images."
+display:
+  source_url: "https://github.com/remind101/docker-build"
+
+jobs:
+  # build a docker image and push to docker hub and ECR
+  build-push:
+    docker:
+      - image: "{{docker_image}}"
+    environment:
+      DOCKER_BUILDKIT: 1
+      BUILDKIT_PROGRESS: plain
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.14
+      - run:
+          name: Build, tag, and push to Docker Hub and AWS ECR
+          command: docker-build --ecr
+      - run:
+          name: Ensure ECR lifecycle policy is installed
+          command: docker-build aws-ecr-put-default-lifecycle-policy
