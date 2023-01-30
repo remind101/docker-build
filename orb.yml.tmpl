@@ -9,14 +9,15 @@ jobs:
   build-push:
     parameters:
       build-args:
-        description: Additional arguments to be passed to "docker build", e.g. "--target my-stage --build-arg FOO=42"
-        type: string
+        description: >-
+          Additional arguments to be passed to "docker build", e.g. "--target my-stage --build-arg FOO=42".
+        type: "string"
         default: ""
     docker:
       - image: "{{docker_image}}"
     environment:
-      DOCKER_BUILDKIT: 1
-      BUILDKIT_PROGRESS: plain
+      DOCKER_BUILDKIT: "1"
+      BUILDKIT_PROGRESS: "plain"
     steps:
       - checkout
       - setup_remote_docker:
