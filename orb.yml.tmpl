@@ -8,6 +8,12 @@ jobs:
   # build a docker image and push to docker hub and ECR
   build-push:
     parameters:
+      checkout:
+        description: >-
+          If false, skip checking out the repository. This is useful when
+          combined with pre-steps to use only workspace-attached files.
+        type: "boolean"
+        default: true
       build-args:
         description: >-
           Additional arguments to be passed to "docker build", e.g. "--target my-stage --build-arg FOO=42".
@@ -19,7 +25,10 @@ jobs:
       DOCKER_BUILDKIT: "1"
       BUILDKIT_PROGRESS: "plain"
     steps:
-      - checkout
+      - when:
+          condition: << parameters.checkout >>
+          steps:
+            - checkout
       - setup_remote_docker:
           version: 20.10.14
       - run:
