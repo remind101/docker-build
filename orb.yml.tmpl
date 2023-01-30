@@ -7,6 +7,11 @@ display:
 jobs:
   # build a docker image and push to docker hub and ECR
   build-push:
+    parameters:
+      build-args:
+        description: Additional arguments to be passed to "docker build", e.g. "--target my-stage --build-arg FOO=42"
+        type: string
+        default: ""
     docker:
       - image: "{{docker_image}}"
     environment:
@@ -18,7 +23,7 @@ jobs:
           version: 20.10.14
       - run:
           name: Build, tag, and push to Docker Hub and AWS ECR
-          command: docker-build --ecr
+          command: docker-build --ecr -- << parameters.build-args >>
       - run:
           name: Ensure ECR lifecycle policy is installed
           command: docker-build aws-ecr-put-default-lifecycle-policy
