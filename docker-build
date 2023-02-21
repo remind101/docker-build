@@ -78,7 +78,7 @@ docker_pull() {
 }
 
 pull() {
-  docker_pull "$REPO:$BRANCH" \
+  docker_pull "$REPO:$BRANCH_TAG" \
     || docker_pull "$REPO:main" \
     || docker_pull "$REPO:master" \
     || docker_pull "$REPO:latest" \
@@ -115,7 +115,7 @@ build() {
 build_with_cache() {
   if [ "${DOCKER_BUILDKIT:-}" = "1" ]; then
     build \
-      --cache-from "$REPO:$BRANCH" \
+      --cache-from "$REPO:$BRANCH_TAG" \
       --cache-from "$REPO:master" \
       --cache-from "$REPO:main" \
       --cache-from "$REPO:latest" \
@@ -209,6 +209,7 @@ esac
 if [ -n "${CIRCLECI+x}" ]; then
   REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
   BRANCH="$CIRCLE_BRANCH"
+  BRANCH_TAG="$(echo -n "$BRANCH" | tr -c '[:alnum:]-._' '-')"
   SHA="$CIRCLE_SHA1"
   BUILD="$CIRCLE_BUILD_NUM"
 else
@@ -229,12 +230,12 @@ fi
 
 if [ -n "${NO_EXTRA_TAGS+x}" ]; then
   if [ "$BRANCH" = "master" ]; then
-    TAGS="$BRANCH ${BRANCH}-${BUILD} latest"
+    TAGS="$BRANCH_TAG ${BRANCH_TAG}-${BUILD} latest"
   else
     TAGS="latest"
   fi
 else
-  TAGS="$SHA $BRANCH ${BRANCH}-${BUILD} latest"
+  TAGS="$SHA $BRANCH_TAG ${BRANCH_TAG}-${BUILD} latest"
 fi
 
 DOCKER_BUILD_PATH="${DOCKER_BUILD_PATH:-.}"
