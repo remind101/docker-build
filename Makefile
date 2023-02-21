@@ -22,5 +22,5 @@ push-docker-image: docker-image
 publish-orb: orb.yml
 	circleci orb publish orb.yml "$(ORB_NAME)"
 
-orb.yml: orb.yml.tmpl
+orb.yml: orb.tmpl.yml
 	sed 's|{{docker_image}}|$(DOCKER_IMAGE)|g' $< > $@
