@@ -1,277 +1,72 @@
-#!/bin/sh
-# shellcheck shell=dash
-
-set -eu
-
-# Usage prints the help for this command.
-usage() {
-  >&2 cat <<EOF
-Usage:
-    docker-build [OPTIONS]
-    docker-build COMMAND [OPTIONS]
-
-Docker CLI wrapper that injects defaults for a more consistent
-CI process. Currently only works in CircleCI.
-
-Running docker-build with no COMMAND will do the following automatically:
-1. Log in to Docker Hub
-2. Build with automatic cache-from
-3. Push to the standard set of tags on Docker Hub
-4. If ECR context vars are present:
-    a. Create an ECR repo if it doesn't exist
-    b. Log in to ECR
-    c. Push to the standard set of tags on ECR
-
-Any OPTIONS specified will be passed to 'docker build' (if applicable).
-
-Commands:
-    pull              Attempt to pull the latest cache tag to build a layer cache
-    build             Build a docker image from this repo and tag it with the git SHA1 and branch
-    build-with-cache  Build with automatic --cache-from
-    push              Push the built image(s) to the docker registry
-    push-to-registry  Push the build image(s) to the given registry.
-    hub-login         Automatically log in to docker hub using DOCKER_USER and DOCKER_PASS
-
-    aws-ecr-login                         Automatically log in to ECR using AWS_ECR_ACCOUNT_URL and AWS_REGION
-    aws-ecr-create-repo                   Automatically create an ECR repo in AWS_REGION if it doesn't already exist
-    aws-ecr-put-default-lifecycle-policy  Put the default lifecycle policy to the ECR repo
-    aws-ecr-push                          Push the build image(s) to ECr.
-
-Tags:
-    The following tags will be built and pushed by default:
-      \$REPO:\$SHA1
-      \$REPO:\$BRANCH
-      \$REPO:\$BRANCH-\$BUILD
-      \$REPO:latest
-
-    If NO_EXTRA_TAGS is set, only "latest" will be used, unless the branch is
-    "master", in which case it will also tag "master".
-
-    Cache will be used following tags if they exist:
-      \$REPO:\$BRANCH
-      \$REPO:master
-      \$REPO:main
-      \$REPO:latest
-
-Examples:
-    Basic usage:
-      $ docker-build
-
-    Build, but don't tag with branch and SHA1 tags:
-      $ NO_EXTRA_TAGS=1 docker-build build
-
-    Build and push an image with a multi-stage Dockerfile:
-      $ docker-build --target main
-
-    Build with a specific path:
-      $ DOCKER_BUILD_PATH=./site docker-build build
-
-    Build with buildkit (Docker >= 19.03):
-      $ DOCKER_BUILDKIT=1 docker-build
-EOF
-}
-
-# Performs a docker pull, and outputs the image reference to stdout if successfull
-docker_pull() {
-  local ref="$1"
-  docker pull "$ref" 1>&2 && echo "$ref"
-}
-
-pull() {
-  docker_pull "$REPO:$BRANCH_TAG" \
-    || docker_pull "$REPO:main" \
-    || docker_pull "$REPO:master" \
-    || docker_pull "$REPO:latest" \
-    || echo "$REPO"
-}
-
-# Build builds the docker image and tags it with the git sha and branch.
-build() {
-  local args=""
-  for tag in $TAGS; do
-    args="$args -t $REPO:$tag"
-  done
-  if [ "${DOCKER_BUILDKIT:-}" = "1" ]; then
-    # Always include BuildKit inline cache when BuildKit is enabled, this
-    # allows --cache-from to work for multi-stage builds.
-    # BuildKit's default progress output is nice in interactive terminals but
-    # not so much in CI where we want simple sequential logs, so we also always
-    # set progress to plain with BuildKit.
-    args="$args --build-arg BUILDKIT_INLINE_CACHE=1 --progress plain"
-  fi
-
-  # Quoting $args will break this since ash doesn't support field splitting on
-  # anything other than "$@" - disabling shellcheck so that we don't get a
-  # warning.
-  # shellcheck disable=SC2086
-  docker build \
-    --build-arg "GIT_COMMIT=$SHA" \
-    --build-arg "GIT_BRANCH=$BRANCH" \
-    $args \
-    "$@" \
-    "$DOCKER_BUILD_PATH"
-}
-
-build_with_cache() {
-  if [ "${DOCKER_BUILDKIT:-}" = "1" ]; then
-    build \
-      --cache-from "$REPO:$BRANCH_TAG" \
-      --cache-from "$REPO:master" \
-      --cache-from "$REPO:main" \
-      --cache-from "$REPO:latest" \
-      "$@"
-  else
-    build \
-      --cache-from "$(pull)" \
-      "$@"
-  fi
-}
-
-# Push pushes all of the built docker images.
-push() {
-  for tag in $TAGS; do
-    echo "pushing $REPO:$tag"
-    docker push "$REPO:$tag"
-  done
-}
-
-push_to_registry() {
-  local registry="$1"
-  for tag in $TAGS; do
-    echo "pushing $registry/$REPO:$tag"
-    docker tag "$REPO:$tag" "$registry/$REPO:$tag"
-    docker push "$registry/$REPO:$tag"
-  done
-}
-
-# Registry-specific commands ---------------------------
-
-hub_login() {
-  printenv DOCKER_PASS | docker login --username "$DOCKER_USER" --password-stdin
-}
-
-aws_ecr_login() {
-  aws ecr get-login-password --region "$AWS_REGION" \
-  | docker login --username AWS --password-stdin "$AWS_ECR_ACCOUNT_URL"
-}
-
-aws_ecr_create_repo() {
-  aws ecr describe-repositories \
-    --region "$AWS_REGION" \
-    --repository-name "$REPO" \
-    >/dev/null 2>&1 \
-    || aws ecr create-repository \
-    --region "$AWS_REGION" \
-    --repository-name "$REPO" \
-    --image-scanning-configuration scanOnPush=true
-}
-
-aws_ecr_put_lifecycle_policy() {
-  aws ecr put-lifecycle-policy \
-    --region "$AWS_REGION" \
-    --repository-name "$REPO" \
-    --lifecycle-policy-text "$1"
-}
-
-aws_ecr_put_default_lifecycle_policy() {
-  aws_ecr_put_lifecycle_policy "$(cat /default-ecr-lifecycle-policy.json)"
-}
-
-aws_ecr_push() {
-  push_to_registry "$AWS_ECR_ACCOUNT_URL"
-}
-
-# Composite commands -----------------------------------
-
-run() {
-  # Login to docker hub, build, and push.
-  hub_login
-  build_with_cache "$@"
-  push
-
-  if [ "$ECR" = true ]; then
-    if [ "${AWS_ECR_ACCOUNT_URL:-}" = "" ]; then
-      >&2 echo "AWS_ECR_ACCOUNT_URL is not set; did you forget to include the aws-ecr context?"
-      exit 1
-    fi
-    aws_ecr_create_repo
-    aws_ecr_login
-    aws_ecr_push
-  fi
-}
-
-# Main -------------------------------------------------
-
-case "${1:-}" in
-  help|-h|--help) usage; exit 1 ;;
-esac
+#!/usr/bin/env bash
+set -euo pipefail
 
 if [ -n "${CIRCLECI+x}" ]; then
-  REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
-  BRANCH="$CIRCLE_BRANCH"
-  BRANCH_TAG="$(echo -n "$BRANCH" | tr -c '[:alnum:]-._' '-')"
-  SHA="$CIRCLE_SHA1"
-  BUILD="$CIRCLE_BUILD_NUM"
+	REPO="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+	BRANCH="$CIRCLE_BRANCH"
+	SHA="$CIRCLE_SHA1"
+	BUILD="$CIRCLE_BUILD_NUM"
 else
-  >&2 echo "This script only works on CircleCI right now."
-  exit 1
+	echo "This script only works on CircleCI right now." >&2
+	exit 1
 fi
 
-if [ "${DOCKER_BUILDKIT:-}" = 1 ]; then
-  docker_version="$(docker version -f "{{.Server.Version}}")"
-  docker_version_maj="$(echo "$docker_version" | cut -d'.' -f 1)"
-  docker_version_min="$(echo "$docker_version" | cut -d'.' -f 2)"
-  if [ "$docker_version_maj" -lt 19 ] \
-    || { [ "$docker_version_maj" -eq 19 ] && [ "$docker_version_min" -lt 3 ]; }; then
-    >&2 echo "Docker engine version ${docker_version} is too old, must be >= 19.03 to use buildkit"
-    exit 1
-  fi
-fi
+branch_tag="$(echo -n "$BRANCH" | tr -c '[:alnum:]-._' '-')"
+tags=("$SHA" "$branch_tag" "${branch_tag}-${BUILD}" latest)
 
-if [ -n "${NO_EXTRA_TAGS+x}" ]; then
-  if [ "$BRANCH" = "master" ]; then
-    TAGS="$BRANCH_TAG ${BRANCH_TAG}-${BUILD} latest"
-  else
-    TAGS="latest"
-  fi
-else
-  TAGS="$SHA $BRANCH_TAG ${BRANCH_TAG}-${BUILD} latest"
-fi
+# Run docker build
+echo "running docker build" >&2
+build_args=(
+	"--build-arg" "GIT_COMMIT=${SHA}"
+	"--build-arg" "GIT_BRANCH=${BRANCH}"
 
-DOCKER_BUILD_PATH="${DOCKER_BUILD_PATH:-.}"
+	# Always include BuildKit inline cache when BuildKit is enabled, this
+	# allows --cache-from to work for multi-stage builds.
+	# BuildKit's default progress output is nice in interactive terminals but
+	# not so much in CI where we want simple sequential logs, so we also always
+	# set progress to plain with BuildKit.
+	"--build-arg" "BUILDKIT_INLINE_CACHE=1"
+)
+for tag in "${tags[@]}"; do
+	build_args+=("--cache-from" "${REPO}:${tag}")
+	build_args+=("-t" "${REPO}:${tag}")
+done
+set -x
+docker build "${build_args[@]}" "$@" "${DOCKER_BUILD_PATH:-.}"
+set +x
 
-ECR=false
-if [ "${1:-}" = "--ecr" ]; then
-  shift
-  ECR=true
-fi
+# Create ECR repository if it doesn't already exist.
+echo "ensuring ECR repository exists with the right lifecycle policy" >&2
+aws ecr describe-repositories \
+	--region "$AWS_REGION" \
+	--repository-name "$REPO" \
+	>/dev/null 2>&1 \
+	|| aws ecr create-repository \
+	--region "$AWS_REGION" \
+	--repository-name "$REPO" \
+	--image-scanning-configuration scanOnPush=true
 
-case "${1:-}" in
-  pull)
-    shift; pull ;;
-  build)
-    shift; build "$@" ;;
-  build-with-cache)
-    shift; build_with_cache "$@" ;;
-  push)
-    shift; push ;;
-  push-to-registry)
-    shift; push_to_registry "$@" ;;
-  hub-login)
-    shift; hub_login ;;
-  aws-ecr-login)
-    shift; aws_ecr_login ;;
-  aws-ecr-create-repo)
-    shift; aws_ecr_create_repo ;;
-  aws-ecr-put-default-lifecycle-policy)
-    shift; aws_ecr_put_default_lifecycle_policy ;;
-  aws-ecr-push)
-    shift; aws_ecr_push ;;
-  --)
-    shift; run "$@" ;;
-  "")
-    run "$@" ;;
-  *)
-    >&2 echo "Unknown command: ${1:-}"
-    exit 1
-esac
+# Install the default ECR lifecycle policy.
+aws ecr put-lifecycle-policy \
+	--region "$AWS_REGION" \
+	--repository-name "$REPO" \
+	--lifecycle-policy-text "$(cat /default-ecr-lifecycle-policy.json)"
+
+# Log in to Docker Hub
+echo "logging in to Docker Hub" >&2
+printenv DOCKER_PASS | docker login --username "$DOCKER_USER" --password-stdin
+
+# Log in to ECR
+echo "logging in to ECR" >&2
+aws ecr get-login-password --region "$AWS_REGION" \
+	| docker login --username AWS --password-stdin "$AWS_ECR_ACCOUNT_URL"
+
+# Push images
+registries=("docker.io" "$AWS_ECR_ACCOUNT_URL")
+for registry in "${registries[@]}"; do
+	for tag in "${tags[@]}"; do
+		echo "pushing ${registry}/${REPO}:${tag}" >&2
+		docker tag "${REPO}:${tag}" "${registry}/${REPO}:${tag}"
+		docker push "${registry}/${REPO}:${tag}"
+	done
+done

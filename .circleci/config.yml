@@ -22,7 +22,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.14
+          version: 20.10.18
       - run: apk --update add make shellcheck docker git
       - run:
           name: Install CircleCI CLI

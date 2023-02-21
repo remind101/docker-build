@@ -30,10 +30,7 @@ jobs:
           steps:
             - checkout
       - setup_remote_docker:
-          version: 20.10.14
+          version: 20.10.18
       - run:
           name: Build, tag, and push to Docker Hub and AWS ECR
-          command: docker-build --ecr -- << parameters.build-args >>
-      - run:
-          name: Ensure ECR lifecycle policy is installed
-          command: docker-build aws-ecr-put-default-lifecycle-policy
+          command: docker-build << parameters.build-args >>
