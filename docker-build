@@ -11,30 +11,6 @@ else
 	exit 1
 fi
 
-branch_tag="$(echo -n "$BRANCH" | tr -c '[:alnum:]-._' '-')"
-tags=("$SHA" "$branch_tag" "${branch_tag}-${BUILD}" latest)
-
-# Run docker build
-echo "running docker build" >&2
-build_args=(
-	"--build-arg" "GIT_COMMIT=${SHA}"
-	"--build-arg" "GIT_BRANCH=${BRANCH}"
-
-	# Always include BuildKit inline cache when BuildKit is enabled, this
-	# allows --cache-from to work for multi-stage builds.
-	# BuildKit's default progress output is nice in interactive terminals but
-	# not so much in CI where we want simple sequential logs, so we also always
-	# set progress to plain with BuildKit.
-	"--build-arg" "BUILDKIT_INLINE_CACHE=1"
-)
-for tag in "${tags[@]}"; do
-	build_args+=("--cache-from" "${REPO}:${tag}")
-	build_args+=("-t" "${REPO}:${tag}")
-done
-set -x
-docker build "${build_args[@]}" "$@" "${DOCKER_BUILD_PATH:-.}"
-set +x
-
 # Create ECR repository if it doesn't already exist.
 echo "ensuring ECR repository exists with the right lifecycle policy" >&2
 aws ecr describe-repositories \
@@ -61,12 +37,29 @@ echo "logging in to ECR" >&2
 aws ecr get-login-password --region "$AWS_REGION" \
 	| docker login --username AWS --password-stdin "$AWS_ECR_ACCOUNT_URL"
 
-# Push images
 registries=("docker.io" "$AWS_ECR_ACCOUNT_URL")
+branch_tag="$(echo -n "$BRANCH" | tr -c '[:alnum:]-._' '-')"
+tags=("$SHA" "$branch_tag" "${branch_tag}-${BUILD}" latest)
+
+# Run docker build
+echo "running docker build" >&2
+build_args=(
+	"--build-arg" "GIT_COMMIT=${SHA}"
+	"--build-arg" "GIT_BRANCH=${BRANCH}"
+	"--platform" "${DOCKER_BUILD_PLATFORM:-linux/amd64}"
+	"--push"
+	"--cache-to" "type=inline" # remove this once ECR registry cache is supported (see below)
+)
 for registry in "${registries[@]}"; do
 	for tag in "${tags[@]}"; do
-		echo "pushing ${registry}/${REPO}:${tag}" >&2
-		docker tag "${REPO}:${tag}" "${registry}/${REPO}:${tag}"
-		docker push "${registry}/${REPO}:${tag}"
+		build_args+=("--tag" "${registry}/${REPO}:${tag}")
+		# this does not work with ECR yet, relying on inline cache for now
+		# https://github.com/aws/containers-roadmap/issues/876
+		#build_args+=("--cache-to" "type=registry,ref=${registry}/${REPO}:${tag}")
+		build_args+=("--cache-from" "type=registry,ref=${registry}/${REPO}:${tag}")
 	done
 done
+set -x
+docker buildx create --use --driver=docker-container
+docker buildx build "${build_args[@]}" "$@" "${DOCKER_BUILD_PATH:-.}"
+set +x
