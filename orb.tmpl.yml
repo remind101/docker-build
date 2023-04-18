@@ -19,8 +19,13 @@ jobs:
           Additional arguments to be passed to "docker build", e.g. "--target my-stage --build-arg FOO=42".
         type: "string"
         default: ""
+      resource-class:
+        description: Docker executor resource class.
+        type: "string"
+        default: "medium"
     docker:
       - image: "{{docker_image}}"
+    resource_class: << parameters.resource-class >>
     environment:
       DOCKER_BUILDKIT: "1"
       BUILDKIT_PROGRESS: "plain"
