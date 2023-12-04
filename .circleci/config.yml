@@ -4,9 +4,14 @@ workflows:
   build:
     jobs:
       - build:
+          filters:
+            # Also run for version tags.
+            tags:
+              only: "/^v.*/"
           context:
             - docker-hub
             - orb-publishing
+
 
 jobs:
   build:
