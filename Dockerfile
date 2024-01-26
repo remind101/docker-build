@@ -1,4 +1,4 @@
-FROM docker:20.10.18
+FROM docker:24-cli
 
 ENTRYPOINT ["/bin/bash"]
 
