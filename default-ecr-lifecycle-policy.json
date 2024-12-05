@@ -7,7 +7,7 @@
         "tagStatus": "tagged",
         "tagPrefixList": ["master", "main"],
         "countType": "imageCountMoreThan",
-        "countNumber": 1000
+        "countNumber": 100
       },
       "action": {
         "type": "expire"
@@ -19,7 +19,20 @@
       "selection": {
         "tagStatus": "any",
         "countType": "imageCountMoreThan",
-        "countNumber": 5000
+        "countNumber": 100
+      },
+      "action": {
+        "type": "expire"
+      }
+    },
+    {
+      "rulePriority": 3,
+      "description": "Only retain non-master/main images less than 90 days old",
+      "selection": {
+        "tagStatus": "any",
+        "countType": "sinceImagePushed",
+        "countUnit": "days",
+        "countNumber": 90
       },
       "action": {
         "type": "expire"
