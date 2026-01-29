@@ -10,6 +10,13 @@ workflows:
               only: "/^v.*/"
           context:
             - docker-hub
+            # This context contains CIRCLE_TOKEN, which as of 2026-01-29 is an
+            # API token generated in Jack Brown's CircleCI account. It has to be
+            # an org owner in CircleCI. While attempting to rotate it we
+            # couldn't locate where the previous token came from.
+            #
+            # The previous token ended in `0858`; if we ever find that one we
+            # should delete it.
             - orb-publishing
 
 jobs:
